@@ -76,7 +76,7 @@ public plugin_init() {
     RegisterHookChain(RG_CSGameRules_RestartRound,          "RG_RestartRound_post",                     .post = true);
     RegisterHookChain(RG_CBasePlayer_RemovePlayerItem,      "RG_CBasePlayer_RemovePlayerItem_post",     .post = true);
     RegisterHookChain(RG_CBasePlayer_Killed,                "RG_CBasePlayer_Killed_pre",                .post = false);
-    RegisterHookChain(RG_CBasePlayer_TeamChange,            "RG_CBasePlayer_TeamChange_post",           .post = true);
+    RegisterHookChain(RG_CBasePlayer_SwitchTeam,            "RG_CBasePlayer_SwitchTeam_post",           .post = true);
 
     g_iHookChain_RoundEnd = RegisterHookChain(RG_RoundEnd,              "RG_RoundEnd_post",             .post = true);
     g_iHookChain_PlayerSpawn = RegisterHookChain(RG_CBasePlayer_Spawn,  "RG_CBasePlayer_Spawn_post",    .post = true);
@@ -290,23 +290,14 @@ bool:TeamCanTakeAWP(const TeamName:iTeam) {
 SendReasonToPlayer(id, AwpRestrictionType:iReason) {
     SetGlobalTransTarget(id);
 
-    switch (iReason) {
-        case LOW_ONLINE: {
-            client_print_color(id, print_team_red, "%s %l %s", g_pCvarValue[PLUGIN_CHAT_PREFIX], "CHAT_LOW_ONLINE", g_pCvarValue[MIN_PLAYERS], g_pCvarValue[SKIP_SPECTATORS] ? fmt("%l", "CHAT_WITHOUT_SPECTATORS") : "");
-            break;
-        }
-        case TOO_MANY_AWP_ON_TEAM: {
-            client_print_color(id, print_team_red, "%s %l", g_pCvarValue[PLUGIN_CHAT_PREFIX], "CHAT_TOO_MANY_AWP_PER_TEAM", g_pCvarValue[LIMIT_TYPE] == 1 ? g_pCvarValue[MAX_AWP] : g_iNumAllowedAWP);
-            break;
-        }
-        case ROUNDS_PAUSE: {
-            client_print_color(id, print_team_red, "%s %l", g_pCvarValue[PLUGIN_CHAT_PREFIX], "CHAT_ROUNDS_PAUSE", g_pCvarValue[CVAR_ROUNDS_PAUSE]);
-            break;
-        }
-        case LEADING_TEAM: {
-            client_print_color(id, print_team_red, "%s %l", g_pCvarValue[PLUGIN_CHAT_PREFIX], "CHAT_WINNING_TEAM_NO_AWP");
-            break;
-        }
+    if (iReason == LOW_ONLINE) {
+        client_print_color(id, print_team_red, "%s %l %s", g_pCvarValue[PLUGIN_CHAT_PREFIX], "CHAT_LOW_ONLINE", g_pCvarValue[MIN_PLAYERS], g_pCvarValue[SKIP_SPECTATORS] ? fmt("%l", "CHAT_WITHOUT_SPECTATORS") : "");
+    } else if (iReason == TOO_MANY_AWP_ON_TEAM) {
+        client_print_color(id, print_team_red, "%s %l", g_pCvarValue[PLUGIN_CHAT_PREFIX], "CHAT_TOO_MANY_AWP_PER_TEAM", g_pCvarValue[LIMIT_TYPE] == 1 ? g_pCvarValue[MAX_AWP] : g_iNumAllowedAWP);
+    } else if (iReason == ROUNDS_PAUSE) {
+        client_print_color(id, print_team_red, "%s %l", g_pCvarValue[PLUGIN_CHAT_PREFIX], "CHAT_ROUNDS_PAUSE", g_pCvarValue[CVAR_ROUNDS_PAUSE]);
+    } else if (iReason == LEADING_TEAM) {
+        client_print_color(id, print_team_red, "%s %l", g_pCvarValue[PLUGIN_CHAT_PREFIX], "CHAT_WINNING_TEAM_NO_AWP");
     }
 }
 
@@ -474,7 +465,7 @@ public RG_CBasePlayer_Spawn_post(const id) {
     CheckOnline();
 }
 
-public RG_CBasePlayer_TeamChange_post(const id, const iNewTeam, const iOldTeam) {
+public RG_CBasePlayer_SwitchTeam_post(const id) {
     if (g_bIsLowOnline) {
         return;
     }
@@ -495,7 +486,7 @@ public RG_CBasePlayer_TeamChange_post(const id, const iNewTeam, const iOldTeam) 
         return;
     }
 
-    new TeamName:iPlayerTeam = TeamName:iNewTeam;
+    new TeamName:iPlayerTeam = get_member(id, m_iTeam);
 
     new iCTWins = get_member_game(m_iNumCTWins);
     new iTWins = get_member_game(m_iNumTerroristWins);
@@ -504,19 +495,13 @@ public RG_CBasePlayer_TeamChange_post(const id, const iNewTeam, const iOldTeam) 
         return;
     }
 
-    new TeamName:iOldTeamName = TeamName:iOldTeam;
-
     rg_remove_item(id, "weapon_awp");
-
-    if (!IsSkipBot(id)) {
-        g_iAWPAmount[iOldTeamName]--;
-    }
 
     client_print_color(id, print_team_red, "%s %l %l", g_pCvarValue[PLUGIN_CHAT_PREFIX], "CHAT_AWP_TAKEN_AWAY", "CHAT_REASON_LEADING_TEAM");
 
     GiveCompensation(id);
 
-    debug_log(__LINE__, "<TeamChange> Player <%n> moved to leading team, AWP taken.", id);
+    debug_log(__LINE__, "<SwitchTeam> Player <%n> moved to leading team, AWP taken.", id);
 }
 
 public RG_RoundEnd_post(WinStatus:status, ScenarioEventEndRound:event, Float:tmDelay) {
@@ -549,7 +534,7 @@ public CheckOnline() {
 }
 
 GetOnlinePlayers() {
-    new GetPlayers_ExFlags:iFlags = GetPlayers_ExcludeHLTV | GetPlayers_MatchTeam;
+    new GetPlayersFlags:iFlags = GetPlayers_ExcludeHLTV | GetPlayers_MatchTeam;
 
     if (g_pCvarValue[SKIP_BOTS]) {
         iFlags |= GetPlayers_ExcludeBots;
@@ -720,23 +705,19 @@ GiveCompensation(const id) {
         return;
     }
 
-    switch (g_pCvarValue[GIVE_COMPENSATION]) {
-        case -1: {
-            if (random_num(0, 1)) {
-                rg_give_item(id, "weapon_ak47");
-                rg_set_user_bpammo(id, WEAPON_AK47, 90);
-            } else {
-                rg_give_item(id, "weapon_m4a1");
-                rg_set_user_bpammo(id, WEAPON_M4A1, 90);
-            }
+    if (g_pCvarValue[GIVE_COMPENSATION] == -1) {
+        if (random_num(0, 1)) {
+            rg_give_item(id, "weapon_ak47");
+            rg_set_user_bpammo(id, WEAPON_AK47, 90);
+        } else {
+            rg_give_item(id, "weapon_m4a1");
+            rg_set_user_bpammo(id, WEAPON_M4A1, 90);
+        }
 
-            client_print_color(id, print_team_blue, "%s %l", g_pCvarValue[PLUGIN_CHAT_PREFIX], "CHAT_COMPENSATION_RIFLE");
-            break;
-        }
-        default: {
-            rg_add_account(id, g_pCvarValue[GIVE_COMPENSATION]);
-            client_print_color(id, print_team_blue, "%s %l", g_pCvarValue[PLUGIN_CHAT_PREFIX], "CHAT_COMPENSATION_MONEY", g_pCvarValue[GIVE_COMPENSATION]);
-        }
+        client_print_color(id, print_team_blue, "%s %l", g_pCvarValue[PLUGIN_CHAT_PREFIX], "CHAT_COMPENSATION_RIFLE");
+    } else {
+        rg_add_account(id, g_pCvarValue[GIVE_COMPENSATION]);
+        client_print_color(id, print_team_blue, "%s %l", g_pCvarValue[PLUGIN_CHAT_PREFIX], "CHAT_COMPENSATION_MONEY", g_pCvarValue[GIVE_COMPENSATION]);
     }
 }
 
