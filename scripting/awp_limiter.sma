@@ -76,6 +76,7 @@ public plugin_init() {
     RegisterHookChain(RG_CSGameRules_RestartRound,          "RG_RestartRound_post",                     .post = true);
     RegisterHookChain(RG_CBasePlayer_RemovePlayerItem,      "RG_CBasePlayer_RemovePlayerItem_post",     .post = true);
     RegisterHookChain(RG_CBasePlayer_Killed,                "RG_CBasePlayer_Killed_pre",                .post = false);
+    RegisterHookChain(RG_CBasePlayer_TeamChange,            "RG_CBasePlayer_TeamChange_post",           .post = true);
 
     g_iHookChain_RoundEnd = RegisterHookChain(RG_RoundEnd,              "RG_RoundEnd_post",             .post = true);
     g_iHookChain_PlayerSpawn = RegisterHookChain(RG_CBasePlayer_Spawn,  "RG_CBasePlayer_Spawn_post",    .post = true);
@@ -471,6 +472,51 @@ public RG_CBasePlayer_Spawn_post(const id) {
     }
 
     CheckOnline();
+}
+
+public RG_CBasePlayer_TeamChange_post(const id, const iNewTeam, const iOldTeam) {
+    if (g_bIsLowOnline) {
+        return;
+    }
+
+    if (!g_pCvarValue[LEADING_TEAM_RESTRICTION]) {
+        return;
+    }
+
+    if (!is_user_alive(id)) {
+        return;
+    }
+
+    if (!user_has_awp(id)) {
+        return;
+    }
+
+    if (g_bitImmunityFlags && get_user_flags(id) & g_bitImmunityFlags) {
+        return;
+    }
+
+    new TeamName:iPlayerTeam = TeamName:iNewTeam;
+
+    new iCTWins = get_member_game(m_iNumCTWins);
+    new iTWins = get_member_game(m_iNumTerroristWins);
+
+    if (!((iCTWins > iTWins && iPlayerTeam == TEAM_CT) || (iTWins > iCTWins && iPlayerTeam == TEAM_TERRORIST))) {
+        return;
+    }
+
+    new TeamName:iOldTeamName = TeamName:iOldTeam;
+
+    rg_remove_item(id, "weapon_awp");
+
+    if (!g_pCvarValue[SKIP_BOTS] || !IsUserBot[id]) {
+        g_iAWPAmount[iOldTeamName]--;
+    }
+
+    client_print_color(id, print_team_red, "%s %l %l", g_pCvarValue[PLUGIN_CHAT_PREFIX], "CHAT_AWP_TAKEN_AWAY", "CHAT_REASON_LEADING_TEAM");
+
+    GiveCompensation(id);
+
+    debug_log(__LINE__, "<TeamChange> Player <%n> moved to leading team, AWP taken.", id);
 }
 
 public RG_RoundEnd_post(WinStatus:status, ScenarioEventEndRound:event, Float:tmDelay) {
