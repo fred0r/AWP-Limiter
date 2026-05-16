@@ -589,7 +589,7 @@ UnsetLowOnlineMode() {
     g_bIsLowOnline = false;
 
     if (g_pCvarValue[MESSAGE_ALLOWED_AWP]) {
-        client_print_color(0, print_team_blue, "%s %l", g_pCvarValue[PLUGIN_CHAT_PREFIX], "CHAT_AWP_BECAME_AVALIABLE");
+        client_print_color(0, print_team_blue, "%s %l", g_pCvarValue[PLUGIN_CHAT_PREFIX], "CHAT_AWP_BECAME_AVAILABLE");
     }
 
     debug_log(__LINE__, "Low online mode has stopped.");
@@ -789,7 +789,7 @@ CreateCvars() {
     g_pCvarValue[SKIP_SPECTATORS]);
 
     bind_pcvar_num(create_cvar("awpl_message_allow_awp", "1",
-        .description = GetCvarDesc("CVAR_MESSAGE_AWLLOW_AWP"),
+        .description = GetCvarDesc("CVAR_MESSAGE_ALLOW_AWP"),
         .has_min = true, .min_val = 0.0,
         .has_max = true, .max_val = 1.0),
     g_pCvarValue[MESSAGE_ALLOWED_AWP]);
