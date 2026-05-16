@@ -22,7 +22,7 @@ enum _:Cvars {
     MAX_AWP,
     LIMIT_TYPE,
     PERCENT_PLAYERS,
-    IMMNUNITY_FLAG[2],
+    IMMUNITY_FLAG[2],
     IMMUNITY_TYPE[3],
     SKIP_BOTS,
     SKIP_SPECTATORS,
@@ -155,7 +155,7 @@ public _OnConfigsExecuted() {
         debug_log(__LINE__, "Infinite round. Player Spawn hook enabled.");
     }
 
-    g_bitImmunityFlags = read_flags(g_pCvarValue[IMMNUNITY_FLAG]);
+    g_bitImmunityFlags = read_flags(g_pCvarValue[IMMUNITY_FLAG]);
 
     register_cvar("AWPLimiter_version", PLUGIN_VERSION, FCVAR_SERVER | FCVAR_SPONLY | FCVAR_UNLOGGED);
 }
@@ -770,7 +770,7 @@ CreateCvars() {
 
     bind_pcvar_string(pCvar = create_cvar("awpl_immunity_flag", "a",
         .description = GetCvarDesc("CVAR_IMMUNITY_FLAG")),
-    g_pCvarValue[IMMNUNITY_FLAG], charsmax(g_pCvarValue[IMMNUNITY_FLAG]));
+    g_pCvarValue[IMMUNITY_FLAG], charsmax(g_pCvarValue[IMMUNITY_FLAG]));
 
     hook_cvar_change(pCvar, "OnChangeCvar_Immunity");
 
