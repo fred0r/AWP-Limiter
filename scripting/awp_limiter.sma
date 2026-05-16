@@ -167,7 +167,7 @@ public RG_CSGameRules_CanHavePlayerItem_pre(const id, const item) {
 
     debug_log(__LINE__, "<CanHavePlayerItem> called. Player: <%n>", id);
 
-    if (g_bitImmunityFlags && get_user_flags(id) & g_bitImmunityFlags) {
+    if (PlayerHasImmunity(id)) {
         debug_log(__LINE__, "Player has immunity. Skipped.");
         return;
     }
@@ -201,7 +201,7 @@ public RG_CBasePlayer_HasRestrictItem_pre(const id, ItemID:item, ItemRestType:ty
 
     debug_log(__LINE__, "<HasRestrictItem> called. Player: <%n>, Type: %i.", id, type);
 
-    if (g_bitImmunityFlags && get_user_flags(id) & g_bitImmunityFlags) {
+    if (PlayerHasImmunity(id)) {
         debug_log(__LINE__, "Player has immunity. Skipped.");
         return;
     }
@@ -491,7 +491,7 @@ public RG_CBasePlayer_TeamChange_post(const id, const iNewTeam, const iOldTeam) 
         return;
     }
 
-    if (g_bitImmunityFlags && get_user_flags(id) & g_bitImmunityFlags) {
+    if (PlayerHasImmunity(id)) {
         return;
     }
 
@@ -919,6 +919,10 @@ public plugin_end() {
     if (g_bIsDebugActive) {
         log_to_file(g_szLogPach, "================================================================^n");
     }
+}
+
+stock bool:PlayerHasImmunity(const id) {
+    return g_bitImmunityFlags && get_user_flags(id) & g_bitImmunityFlags;
 }
 
 stock bool:user_has_awp(const id) {
