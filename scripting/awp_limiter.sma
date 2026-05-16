@@ -689,6 +689,10 @@ TakeAwpsFromTeam(TeamName:iTeam) {
             continue;
         }
 
+        if (get_member(id, m_iTeam) != iTeam) {
+            continue;
+        }
+
         if (!user_has_awp(id)) {
             continue;
         }
