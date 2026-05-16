@@ -61,7 +61,7 @@ new Trie:g_iSaveRoundsRemaining;
 /* <== DEBUG ==> */
 
 new bool:g_bIsDebugActive;
-new g_szLogPach[MAX_RESOURCE_PATH_LENGTH];
+new g_szLogPath[MAX_RESOURCE_PATH_LENGTH];
 
 /* <====> */
 
@@ -125,9 +125,9 @@ public plugin_init() {
         new iYear, iMonth, iDay;
         date(iYear, iMonth, iDay);
 
-        formatex(g_szLogPach, charsmax(g_szLogPach), "%s/awpl__%i-%02i-%02i.log", szLogsDir, iYear, iMonth, iDay);
+        formatex(g_szLogPath, charsmax(g_szLogPath), "%s/awpl__%i-%02i-%02i.log", szLogsDir, iYear, iMonth, iDay);
 
-        log_to_file(g_szLogPach, "================================================================");
+        log_to_file(g_szLogPath, "================================================================");
 
         debug_log(__LINE__, "Plugin initializated. Map: %s.", szMapName);
     }
@@ -917,7 +917,7 @@ public native_awpl_can_player_take_awp(iPlugin, iParams) {
 
 public plugin_end() {
     if (g_bIsDebugActive) {
-        log_to_file(g_szLogPach, "================================================================^n");
+        log_to_file(g_szLogPath, "================================================================^n");
     }
 }
 
@@ -945,7 +945,7 @@ debug_log(const iLine, const szText[], any: ...) {
 
     format(szLogText, charsmax(szLogText), "[AWPL DEBUG] %s | LINE: %i", szLogText, iLine);
 
-    log_to_file(g_szLogPach, szLogText);
+    log_to_file(g_szLogPath, szLogText);
 }
 
 /* <====> */
