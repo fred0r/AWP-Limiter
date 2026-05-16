@@ -29,7 +29,8 @@ enum _:Cvars {
     MESSAGE_ALLOWED_AWP,
     ROUND_INFINITE,
     GIVE_COMPENSATION,
-    CVAR_ROUNDS_PAUSE
+    CVAR_ROUNDS_PAUSE,
+    LEADING_TEAM_RESTRICTION
 };
 
 new g_pCvarValue[Cvars];
@@ -253,6 +254,16 @@ bool:PlayerCanTakeAWP(const id, &AwpRestrictionType:iReason = AWP_ALLOWED) {
 
     new TeamName:iPlayerTeam = get_member(id, m_iTeam);
 
+    if (g_pCvarValue[LEADING_TEAM_RESTRICTION]) {
+        new iCTWins = get_member_game(m_iNumCTWins);
+        new iTWins = get_member_game(m_iNumTerroristWins);
+
+        if ((iCTWins > iTWins && iPlayerTeam == TEAM_CT) || (iTWins > iCTWins && iPlayerTeam == TEAM_TERRORIST)) {
+            iReason = LEADING_TEAM;
+            return false;
+        }
+    }
+
     if (!TeamCanTakeAWP(iPlayerTeam)) {
         iReason = TOO_MANY_AWP_ON_TEAM;
         return false;
@@ -268,18 +279,8 @@ bool:PlayerCanTakeAWP(const id, &AwpRestrictionType:iReason = AWP_ALLOWED) {
 
 bool:TeamCanTakeAWP(const TeamName:iTeam) {
     switch (g_pCvarValue[LIMIT_TYPE]) {
-        case 1:
-        {
-            if (g_iAWPAmount[iTeam] >= g_pCvarValue[MAX_AWP]) {
-                return false;
-            }
-        }
-        case 2:
-        {
-            if (g_iAWPAmount[iTeam] >= g_iNumAllowedAWP) {
-                return false;
-            }
-        }
+        case 1: return (g_iAWPAmount[iTeam] < g_pCvarValue[MAX_AWP]);
+        case 2: return (g_iAWPAmount[iTeam] < g_iNumAllowedAWP);
     }
 
     return true;
@@ -289,9 +290,22 @@ SendReasonToPlayer(id, AwpRestrictionType:iReason) {
     SetGlobalTransTarget(id);
 
     switch (iReason) {
-        case LOW_ONLINE: client_print_color(id, print_team_red, "%s %l %s", g_pCvarValue[PLUGIN_CHAT_PREFIX], "CHAT_LOW_ONLINE", g_pCvarValue[MIN_PLAYERS], g_pCvarValue[SKIP_SPECTATORS] ? fmt("%l", "CHAT_WITHOUT_SPECTATORS") : "");
-        case TOO_MANY_AWP_ON_TEAM: client_print_color(id, print_team_red, "%s %l", g_pCvarValue[PLUGIN_CHAT_PREFIX], "CHAT_TOO_MANY_AWP_PER_TEAM", g_pCvarValue[LIMIT_TYPE] == 1 ? g_pCvarValue[MAX_AWP] : g_iNumAllowedAWP);
-        case ROUNDS_PAUSE: client_print_color(id, print_team_red, "%s %l", g_pCvarValue[PLUGIN_CHAT_PREFIX], "CHAT_ROUNDS_PAUSE", g_pCvarValue[CVAR_ROUNDS_PAUSE]);
+        case LOW_ONLINE: {
+            client_print_color(id, print_team_red, "%s %l %s", g_pCvarValue[PLUGIN_CHAT_PREFIX], "CHAT_LOW_ONLINE", g_pCvarValue[MIN_PLAYERS], g_pCvarValue[SKIP_SPECTATORS] ? fmt("%l", "CHAT_WITHOUT_SPECTATORS") : "");
+            break;
+        }
+        case TOO_MANY_AWP_ON_TEAM: {
+            client_print_color(id, print_team_red, "%s %l", g_pCvarValue[PLUGIN_CHAT_PREFIX], "CHAT_TOO_MANY_AWP_PER_TEAM", g_pCvarValue[LIMIT_TYPE] == 1 ? g_pCvarValue[MAX_AWP] : g_iNumAllowedAWP);
+            break;
+        }
+        case ROUNDS_PAUSE: {
+            client_print_color(id, print_team_red, "%s %l", g_pCvarValue[PLUGIN_CHAT_PREFIX], "CHAT_ROUNDS_PAUSE", g_pCvarValue[CVAR_ROUNDS_PAUSE]);
+            break;
+        }
+        case LEADING_TEAM: {
+            client_print_color(id, print_team_red, "%s %l", g_pCvarValue[PLUGIN_CHAT_PREFIX], "CHAT_WINNING_TEAM_NO_AWP");
+            break;
+        }
     }
 }
 
@@ -544,6 +558,7 @@ CheckTeamLimit() {
             if (g_iAWPAmount[TEAM_CT] > g_pCvarValue[MAX_AWP]) {
                 TakeAwpsFromTeam(TEAM_CT);
             }
+            break;
         }
         case 2: {
             g_iNumAllowedAWP = floatround(g_iOnlinePlayers * (g_pCvarValue[PERCENT_PLAYERS] / 100.0), floatround_floor);
@@ -563,6 +578,7 @@ CheckTeamLimit() {
             if (g_iAWPAmount[TEAM_CT] > g_iNumAllowedAWP) {
                 TakeAwpsFromTeam(TEAM_CT);
             }
+            break;
         }
     }
 }
@@ -671,6 +687,7 @@ GiveCompensation(const id) {
             }
 
             client_print_color(id, print_team_blue, "%s %l", g_pCvarValue[PLUGIN_CHAT_PREFIX], "CHAT_COMPENSATION_RIFLE");
+            break;
         }
         default: {
             rg_add_account(id, g_pCvarValue[GIVE_COMPENSATION]);
@@ -749,6 +766,12 @@ CreateCvars() {
         .description = GetCvarDesc("CVAR_ROUNDS_PAUSE"),
         .has_min = true, .min_val = 0.0),
     g_pCvarValue[CVAR_ROUNDS_PAUSE]);
+
+    bind_pcvar_num(create_cvar("awpl_leader_no_awp", "0",
+        .description = GetCvarDesc("CVAR_WINNER_NO_AWP"),
+        .has_min = true, .min_val = 0.0,
+        .has_max = true, .max_val = 1.0),
+    g_pCvarValue[LEADING_TEAM_RESTRICTION]);
 }
 
 public OnChangeCvar_RoundInfinite(pCvar, const szOldValue[], const szNewValue[]) {

@@ -22,7 +22,8 @@ enum AwpRestrictionType:RESTRICTION_TYPE
     AWP_ALLOWED,
     LOW_ONLINE,
     TOO_MANY_AWP_ON_TEAM,
-    ROUNDS_PAUSE
+    ROUNDS_PAUSE,
+    LEADING_TEAM
 };
 
 /**
