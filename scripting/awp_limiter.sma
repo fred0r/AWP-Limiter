@@ -321,7 +321,7 @@ public RG_CBasePlayer_AddPlayerItem_post(const id, const pItem) {
 
     debug_log(__LINE__, "<AddPlayerItem> called. Player: <%n>", id);
 
-    if (g_pCvarValue[SKIP_BOTS] && IsUserBot[id]) {
+    if (IsSkipBot(id)) {
         debug_log(__LINE__, "Player is bot. Skipped.");
         return;
     }
@@ -376,7 +376,7 @@ public RG_CBasePlayer_RemovePlayerItem_post(const id, const pItem) {
 
     debug_log(__LINE__, "<RemovePlayerItem> called. Player: <%n>", id);
 
-    if (g_pCvarValue[SKIP_BOTS] && IsUserBot[id]) {
+    if (IsSkipBot(id)) {
         debug_log(__LINE__, "Player is bot. Skipped.");
         return;
     }
@@ -443,7 +443,7 @@ public RG_RestartRound_post() {
             continue;
         }
 
-        if (g_pCvarValue[SKIP_BOTS] && is_user_bot(id)) {
+        if (IsSkipBot(id)) {
             continue;
         }
 
@@ -508,7 +508,7 @@ public RG_CBasePlayer_TeamChange_post(const id, const iNewTeam, const iOldTeam) 
 
     rg_remove_item(id, "weapon_awp");
 
-    if (!g_pCvarValue[SKIP_BOTS] || !IsUserBot[id]) {
+    if (!IsSkipBot(id)) {
         g_iAWPAmount[iOldTeamName]--;
     }
 
@@ -923,6 +923,10 @@ public plugin_end() {
 
 stock bool:PlayerHasImmunity(const id) {
     return g_bitImmunityFlags && get_user_flags(id) & g_bitImmunityFlags;
+}
+
+stock bool:IsSkipBot(const id) {
+    return g_pCvarValue[SKIP_BOTS] && IsUserBot[id];
 }
 
 stock bool:user_has_awp(const id) {
