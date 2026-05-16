@@ -549,13 +549,16 @@ public CheckOnline() {
 }
 
 GetOnlinePlayers() {
-    new iNumCT = get_playersnum_ex(g_pCvarValue[SKIP_BOTS] ? (GetPlayers_ExcludeBots | GetPlayers_ExcludeHLTV | GetPlayers_MatchTeam) : (GetPlayers_ExcludeHLTV | GetPlayers_MatchTeam), "CT");
-    new iNumTE = get_playersnum_ex(g_pCvarValue[SKIP_BOTS] ? (GetPlayers_ExcludeBots | GetPlayers_ExcludeHLTV | GetPlayers_MatchTeam) : (GetPlayers_ExcludeHLTV | GetPlayers_MatchTeam), "TERRORIST");
+    new GetPlayers_ExFlags:iFlags = GetPlayers_ExcludeHLTV | GetPlayers_MatchTeam;
 
-    g_iOnlinePlayers = iNumCT + iNumTE;
+    if (g_pCvarValue[SKIP_BOTS]) {
+        iFlags |= GetPlayers_ExcludeBots;
+    }
+
+    g_iOnlinePlayers = get_playersnum_ex(iFlags, "CT") + get_playersnum_ex(iFlags, "TERRORIST");
 
     if (!g_pCvarValue[SKIP_SPECTATORS]) {
-        g_iOnlinePlayers += get_playersnum_ex(GetPlayers_ExcludeBots | GetPlayers_ExcludeHLTV | GetPlayers_MatchTeam, "SPECTATOR");
+        g_iOnlinePlayers += get_playersnum_ex(iFlags, "SPECTATOR");
     }
 }
 
