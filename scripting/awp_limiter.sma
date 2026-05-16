@@ -596,38 +596,29 @@ UnsetLowOnlineMode() {
 }
 
 CheckTeamLimit() {
+    new iLimit;
+
     switch (g_pCvarValue[LIMIT_TYPE]) {
         case 1: {
-            debug_log(__LINE__, "Limit type: 1. Max AWP per team: %i", g_pCvarValue[MAX_AWP]);
-
-            if (g_iAWPAmount[TEAM_TERRORIST] > g_pCvarValue[MAX_AWP]) {
-                TakeAwpsFromTeam(TEAM_TERRORIST);
-            }
-
-            if (g_iAWPAmount[TEAM_CT] > g_pCvarValue[MAX_AWP]) {
-                TakeAwpsFromTeam(TEAM_CT);
-            }
-            break;
+            iLimit = g_pCvarValue[MAX_AWP];
+            debug_log(__LINE__, "Limit type: 1. Max AWP per team: %i", iLimit);
         }
         case 2: {
-            g_iNumAllowedAWP = floatround(g_iOnlinePlayers * (g_pCvarValue[PERCENT_PLAYERS] / 100.0), floatround_floor);
+            iLimit = floatround(g_iOnlinePlayers * (g_pCvarValue[PERCENT_PLAYERS] / 100.0), floatround_floor);
 
-            debug_log(__LINE__, "Limit type: 2. Cvar percent: %i, calculated num of max AWP per team: %i", g_pCvarValue[PERCENT_PLAYERS], g_iNumAllowedAWP);
-
-            if (g_iNumAllowedAWP < 1) {
-                g_iNumAllowedAWP = 1;
-
-                debug_log(__LINE__, "The AWP limit is less than one, so it was set to 1.", g_pCvarValue[PERCENT_PLAYERS], g_iNumAllowedAWP);
+            if (iLimit < 1) {
+                iLimit = 1;
             }
 
-            if (g_iAWPAmount[TEAM_TERRORIST] > g_iNumAllowedAWP) {
-                TakeAwpsFromTeam(TEAM_TERRORIST);
-            }
+            debug_log(__LINE__, "Limit type: 2. Cvar percent: %i, calculated num of max AWP per team: %i", g_pCvarValue[PERCENT_PLAYERS], iLimit);
+        }
+    }
 
-            if (g_iAWPAmount[TEAM_CT] > g_iNumAllowedAWP) {
-                TakeAwpsFromTeam(TEAM_CT);
-            }
-            break;
+    g_iNumAllowedAWP = iLimit;
+
+    for (new TeamName:i = TEAM_TERRORIST; i <= TEAM_CT; i++) {
+        if (g_iAWPAmount[i] > iLimit) {
+            TakeAwpsFromTeam(i);
         }
     }
 }
