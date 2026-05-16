@@ -792,7 +792,7 @@ CreateCvars() {
         .has_min = true, .min_val = 0.0),
     g_pCvarValue[CVAR_ROUNDS_PAUSE]);
 
-    bind_pcvar_num(create_cvar("awpl_leader_no_awp", "0",
+    bind_pcvar_num(create_cvar("awpl_winner_no_awp", "0",
         .description = GetCvarDesc("CVAR_WINNER_NO_AWP"),
         .has_min = true, .min_val = 0.0,
         .has_max = true, .max_val = 1.0),
