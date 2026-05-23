@@ -895,9 +895,11 @@ public native_awpl_can_player_take_awp(iPlugin, iParams) {
 }
 
 public plugin_end() {
-    if (g_bIsDebugActive) {
-        log_to_file(g_szLogPath, "================================================================^n");
-    }
+	TrieDestroy(g_iSaveRoundsRemaining);
+
+	if (g_bIsDebugActive) {
+		log_to_file(g_szLogPath, "================================================================^n");
+	}
 }
 
 stock bool:PlayerHasImmunity(const id) {

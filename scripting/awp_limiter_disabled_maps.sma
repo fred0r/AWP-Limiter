@@ -39,6 +39,7 @@ public awpl_plugin_should_work_on_this_map(const szMapName[])
     INI_SetReaders(iParser, "OnReadConfigKeyValue");
     new iResult = INI_ParseFile(iParser, szConfigPath, .data = packedMapName);
     INI_DestroyParser(iParser);
+    DestroyDataPack(packedMapName);
 
     if(!iResult)
     {
@@ -55,7 +56,6 @@ public bool:OnReadConfigKeyValue(INIParser:handle, const key[], const value[], b
     if(!szMapName[0])
     {
         ReadPackString(data, szMapName, charsmax(szMapName));
-        DestroyDataPack(data);
     }
 
     if(strcmp(szMapName, key, true) == 0)
