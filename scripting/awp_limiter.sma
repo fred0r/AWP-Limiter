@@ -34,6 +34,7 @@ enum _:Cvars {
 };
 
 new g_pCvarValue[Cvars];
+new g_pCvarHandle[Cvars];
 
 enum _:API_FORWARDS {
     LOW_ONLINE_MODE_START,
@@ -57,6 +58,72 @@ new g_iOnlinePlayers;
 new bool:IsUserBot[MAX_PLAYERS + 1];
 new g_bPauseRoundsRemaining[MAX_PLAYERS + 1];
 new Trie:g_iSaveRoundsRemaining;
+
+enum _:CvarMigration {
+    MIGR_PLUGIN_CHAT_PREFIX,
+    MIGR_MIN_PLAYERS,
+    MIGR_MAX_AWP,
+    MIGR_LIMIT_TYPE,
+    MIGR_PERCENT_PLAYERS,
+    MIGR_IMMUNITY_FLAG,
+    MIGR_SKIP_BOTS,
+    MIGR_SKIP_SPECTATORS,
+    MIGR_MESSAGE_ALLOWED_AWP,
+    MIGR_ROUND_INFINITE,
+    MIGR_GIVE_COMPENSATION,
+    MIGR_ROUNDS_PAUSE,
+    MIGR_WINNER_NO_AWP
+};
+
+new const g_szCvarMigName[CvarMigration][] = {
+    "awpl_chat_prefix",
+    "awpl_min_players",
+    "awpl_max_awp",
+    "awpl_limit_type",
+    "awpl_percent_players",
+    "awpl_immunity_flag",
+    "awpl_skip_bots",
+    "awpl_skip_spectators",
+    "awpl_message_allow_awp",
+    "awpl_round_infinite",
+    "awpl_give_compensation",
+    "awpl_rounds_pause_num",
+    "awpl_winner_no_awp"
+};
+
+new const g_szCvarMigDesc[CvarMigration][] = {
+    "",
+    "CVAR_MIN_PLAYERS",
+    "CVAR_MAX_AWP",
+    "CVAR_LIMIT_TYPE",
+    "CVAR_PERCENT_PLAYERS",
+    "CVAR_IMMUNITY_FLAG",
+    "CVAR_SKIP_BOTS",
+    "CVAR_SKIP_SPECTATORS",
+    "CVAR_MESSAGE_ALLOW_AWP",
+    "CVAR_ROUND_INFINITE",
+    "CVAR_GIVE_COMPENSATION",
+    "CVAR_ROUNDS_PAUSE",
+    "CVAR_WINNER_NO_AWP"
+};
+
+new const g_szCvarMigDefault[CvarMigration][] = {
+    "^3[^4AWP^3]",
+    "10",
+    "2",
+    "1",
+    "10",
+    "a",
+    "0",
+    "1",
+    "1",
+    "0",
+    "-1",
+    "0",
+    "0"
+};
+
+new const g_szCvarMigDefaultDesc[] = "Plugin prefix.";
 
 /* <== DEBUG ==> */
 
@@ -158,6 +225,54 @@ public _OnConfigsExecuted() {
     g_bitImmunityFlags = read_flags(g_pCvarValue[IMMUNITY_FLAG]);
 
     register_cvar("AWPLimiter_version", PLUGIN_VERSION, FCVAR_SERVER | FCVAR_SPONLY | FCVAR_UNLOGGED);
+}
+
+public plugin_cfg() {
+    new szFilePath[MAX_RESOURCE_PATH_LENGTH];
+    get_configsdir(szFilePath, charsmax(szFilePath));
+    add(szFilePath, charsmax(szFilePath), "/AWPLimiter.cfg");
+
+    if (!file_exists(szFilePath)) {
+        return;
+    }
+
+    new szContent[16384];
+    new hFile = fopen(szFilePath, "rt");
+    new iSize = min(file_size(szFilePath), charsmax(szContent));
+    fread(hFile, szContent, iSize);
+    fclose(hFile);
+
+    new szMissingBlock[4096];
+    new bool:bHasMissing;
+
+    new szDescBuf[384];
+
+    for (new i = 0; i < sizeof g_szCvarMigName; i++) {
+        if (IsCvarInConfig(szContent, g_szCvarMigName[i])) {
+            continue;
+        }
+
+        if (g_szCvarMigDesc[i][0]) {
+            FormatCvarDesc(g_szCvarMigDesc[i], szDescBuf, charsmax(szDescBuf));
+        } else {
+            FormatCvarDescDefault(g_szCvarMigDefaultDesc, szDescBuf, charsmax(szDescBuf));
+        }
+
+        add(szMissingBlock, charsmax(szMissingBlock), "^n");
+        add(szMissingBlock, charsmax(szMissingBlock), szDescBuf);
+
+        AppendCvarLine(g_szCvarMigName[i], g_szCvarMigDefault[i], szMissingBlock, charsmax(szMissingBlock));
+
+        bHasMissing = true;
+    }
+
+    if (!bHasMissing) {
+        return;
+    }
+
+    hFile = fopen(szFilePath, "at");
+    fputs(hFile, szMissingBlock);
+    fclose(hFile);
 }
 
 public RG_CSGameRules_CanHavePlayerItem_pre(const id, const item) {
@@ -722,77 +837,75 @@ GiveCompensation(const id) {
 }
 
 CreateCvars() {
-    new pCvar;
-
-    bind_pcvar_string(create_cvar("awpl_chat_prefix", "^3[^4AWP^3]",
+    bind_pcvar_string(g_pCvarHandle[PLUGIN_CHAT_PREFIX] = create_cvar("awpl_chat_prefix", "^3[^4AWP^3]",
         .description = "Plugin prefix."),
     g_pCvarValue[PLUGIN_CHAT_PREFIX], charsmax(g_pCvarValue[PLUGIN_CHAT_PREFIX]));
 
-    bind_pcvar_num(create_cvar("awpl_min_players", "10",
+    bind_pcvar_num(g_pCvarHandle[MIN_PLAYERS] = create_cvar("awpl_min_players", "10",
         .description = GetCvarDesc("CVAR_MIN_PLAYERS")),
     g_pCvarValue[MIN_PLAYERS]);
 
-    bind_pcvar_num(create_cvar("awpl_limit_type", "1",
+    bind_pcvar_num(g_pCvarHandle[LIMIT_TYPE] = create_cvar("awpl_limit_type", "1",
         .description = GetCvarDesc("CVAR_LIMIT_TYPE"),
         .has_min = true, .min_val = 1.0,
         .has_max = true, .max_val = 2.0),
     g_pCvarValue[LIMIT_TYPE]);
 
-    bind_pcvar_num(create_cvar("awpl_max_awp", "2",
+    bind_pcvar_num(g_pCvarHandle[MAX_AWP] = create_cvar("awpl_max_awp", "2",
         .description = GetCvarDesc("CVAR_MAX_AWP"),
         .has_min = true, .min_val = 1.0),
     g_pCvarValue[MAX_AWP]);
 
-    bind_pcvar_num(create_cvar("awpl_percent_players", "10",
+    bind_pcvar_num(g_pCvarHandle[PERCENT_PLAYERS] = create_cvar("awpl_percent_players", "10",
         .description = GetCvarDesc("CVAR_PERCENT_PLAYERS")),
     g_pCvarValue[PERCENT_PLAYERS]);
 
-    bind_pcvar_string(pCvar = create_cvar("awpl_immunity_flag", "a",
+    bind_pcvar_string(g_pCvarHandle[IMMUNITY_FLAG] = create_cvar("awpl_immunity_flag", "a",
         .description = GetCvarDesc("CVAR_IMMUNITY_FLAG")),
     g_pCvarValue[IMMUNITY_FLAG], charsmax(g_pCvarValue[IMMUNITY_FLAG]));
 
-    hook_cvar_change(pCvar, "OnChangeCvar_Immunity");
+    hook_cvar_change(g_pCvarHandle[IMMUNITY_FLAG], "OnChangeCvar_Immunity");
 
     // bind_pcvar_string(create_cvar("awpl_immunity_type", "abc",
     //     .description = "Иммунитет от запрета:^na — Покупки AWP^nb — Поднятия с земли^nc — Взятия в различных меню"),
     // g_pCvarValue[IMMUNITY_TYPE], charsmax(g_pCvarValue[IMMUNITY_TYPE]));
 
-    bind_pcvar_num(create_cvar("awpl_skip_bots", "0",
+    bind_pcvar_num(g_pCvarHandle[SKIP_BOTS] = create_cvar("awpl_skip_bots", "0",
         .description = GetCvarDesc("CVAR_SKIP_BOTS"),
         .has_min = true, .min_val = 0.0,
         .has_max = true, .max_val = 1.0),
     g_pCvarValue[SKIP_BOTS]);
 
-    bind_pcvar_num(create_cvar("awpl_skip_spectators", "1",
+    bind_pcvar_num(g_pCvarHandle[SKIP_SPECTATORS] = create_cvar("awpl_skip_spectators", "1",
         .description = GetCvarDesc("CVAR_SKIP_SPECTATORS"),
         .has_min = true, .min_val = 0.0,
         .has_max = true, .max_val = 1.0),
     g_pCvarValue[SKIP_SPECTATORS]);
 
-    bind_pcvar_num(create_cvar("awpl_message_allow_awp", "1",
+    bind_pcvar_num(g_pCvarHandle[MESSAGE_ALLOWED_AWP] = create_cvar("awpl_message_allow_awp", "1",
         .description = GetCvarDesc("CVAR_MESSAGE_ALLOW_AWP"),
         .has_min = true, .min_val = 0.0,
         .has_max = true, .max_val = 1.0),
     g_pCvarValue[MESSAGE_ALLOWED_AWP]);
 
-    bind_pcvar_num(pCvar = create_cvar("awpl_round_infinite", "0",
+    bind_pcvar_num(g_pCvarHandle[ROUND_INFINITE] = create_cvar("awpl_round_infinite", "0",
         .description = GetCvarDesc("CVAR_ROUND_INFINITE"),
         .has_min = true, .min_val = -1.0),
     g_pCvarValue[ROUND_INFINITE]);
 
-    hook_cvar_change(pCvar, "OnChangeCvar_RoundInfinite");
+    hook_cvar_change(g_pCvarHandle[ROUND_INFINITE], "OnChangeCvar_RoundInfinite");
 
-    bind_pcvar_num(create_cvar("awpl_give_compensation", "-1",
+    bind_pcvar_num(g_pCvarHandle[GIVE_COMPENSATION] = create_cvar("awpl_give_compensation", "-1",
         .description = GetCvarDesc("CVAR_GIVE_COMPENSATION"),
         .has_min = true, .min_val = -1.0),
     g_pCvarValue[GIVE_COMPENSATION]);
 
-    bind_pcvar_num(create_cvar("awpl_rounds_pause_num", "0",
+    bind_pcvar_num(g_pCvarHandle[CVAR_ROUNDS_PAUSE] = create_cvar("awpl_rounds_pause_num", "0",
         .description = GetCvarDesc("CVAR_ROUNDS_PAUSE"),
         .has_min = true, .min_val = 0.0),
     g_pCvarValue[CVAR_ROUNDS_PAUSE]);
 
-    bind_pcvar_num(create_cvar("awpl_winner_no_awp", "0",
+    bind_pcvar_num(g_pCvarHandle[LEADING_TEAM_RESTRICTION] = create_cvar("awpl_winner_no_awp", "0",
         .description = GetCvarDesc("CVAR_WINNER_NO_AWP"),
         .has_min = true, .min_val = 0.0,
         .has_max = true, .max_val = 1.0),
@@ -900,6 +1013,75 @@ public plugin_end() {
 	if (g_bIsDebugActive) {
 		log_to_file(g_szLogPath, "================================================================^n");
 	}
+}
+
+stock bool:IsCvarInConfig(const szContent[], const szCvarName[]) {
+    new iNameLen = strlen(szCvarName);
+
+    if (strfind(szContent, szCvarName) == 0) {
+        return szContent[iNameLen] == ' ' || szContent[iNameLen] == '\t';
+    }
+
+    new szPattern[64];
+
+    formatex(szPattern, charsmax(szPattern), "^n%s ", szCvarName);
+
+    if (strfind(szContent, szPattern) != -1) {
+        return true;
+    }
+
+    formatex(szPattern, charsmax(szPattern), "^n%s^t", szCvarName);
+    return strfind(szContent, szPattern) != -1;
+}
+
+stock FormatCvarDesc(const szDescKey[], szOutput[], const iMaxLen) {
+    static szDescRaw[384];
+    formatex(szDescRaw, charsmax(szDescRaw), "%L", LANG_SERVER, szDescKey);
+
+    static szLine[128];
+    new iLinePos;
+    new iLen = strlen(szDescRaw) + 1;
+
+    for (new i; i < iLen; i++) {
+        if (szDescRaw[i] == '^' && szDescRaw[i + 1] == 'n') {
+            add(szOutput, iMaxLen, "// ");
+            add(szOutput, iMaxLen, szLine);
+            add(szOutput, iMaxLen, "^n");
+            szLine[0] = EOS;
+            iLinePos = 0;
+            i++;
+            continue;
+        }
+
+        szLine[iLinePos++] = szDescRaw[i];
+    }
+
+    if (iLinePos) {
+        add(szOutput, iMaxLen, "// ");
+        add(szOutput, iMaxLen, szLine);
+        add(szOutput, iMaxLen, "^n");
+    }
+}
+
+stock FormatCvarDescDefault(const szDesc[], szOutput[], const iMaxLen) {
+    add(szOutput, iMaxLen, "// ");
+    add(szOutput, iMaxLen, szDesc);
+    add(szOutput, iMaxLen, "^n");
+}
+
+stock AppendCvarLine(const szName[], const szValue[], szOutput[], const iMaxLen) {
+    add(szOutput, iMaxLen, szName);
+    add(szOutput, iMaxLen, " ");
+
+    if (szValue[0] == '"' || isdigit(szValue[0]) || szValue[0] == '-') {
+        add(szOutput, iMaxLen, szValue);
+    } else {
+        add(szOutput, iMaxLen, "^"");
+        add(szOutput, iMaxLen, szValue);
+        add(szOutput, iMaxLen, "^"");
+    }
+
+    add(szOutput, iMaxLen, "^n");
 }
 
 stock bool:PlayerHasImmunity(const id) {
