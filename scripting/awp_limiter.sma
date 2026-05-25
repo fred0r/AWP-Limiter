@@ -238,8 +238,7 @@ public plugin_cfg() {
 
     new szContent[16384];
     new hFile = fopen(szFilePath, "rt");
-    new iSize = min(file_size(szFilePath), charsmax(szContent));
-    fread(hFile, szContent, iSize);
+    fread(hFile, szContent, charsmax(szContent));
     fclose(hFile);
 
     new szMissingBlock[4096];
@@ -1019,7 +1018,7 @@ stock bool:IsCvarInConfig(const szContent[], const szCvarName[]) {
     new iNameLen = strlen(szCvarName);
 
     if (strfind(szContent, szCvarName) == 0) {
-        return szContent[iNameLen] == ' ' || szContent[iNameLen] == '\t';
+        return szContent[iNameLen] == ' ' || szContent[iNameLen] == '^t';
     }
 
     new szPattern[64];
@@ -1043,7 +1042,7 @@ stock FormatCvarDesc(const szDescKey[], szOutput[], const iMaxLen) {
     new iLen = strlen(szDescRaw) + 1;
 
     for (new i; i < iLen; i++) {
-        if (szDescRaw[i] == '^' && szDescRaw[i + 1] == 'n') {
+        if (szDescRaw[i] == '^^' && szDescRaw[i + 1] == 'n') {
             add(szOutput, iMaxLen, "// ");
             add(szOutput, iMaxLen, szLine);
             add(szOutput, iMaxLen, "^n");
