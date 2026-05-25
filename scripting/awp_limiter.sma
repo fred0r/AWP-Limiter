@@ -238,7 +238,12 @@ public plugin_cfg() {
 
     new szContent[16384];
     new hFile = fopen(szFilePath, "rt");
-    fread(hFile, szContent, charsmax(szContent));
+    new szLine[256];
+
+    while (fgets(hFile, szLine, charsmax(szLine))) {
+        add(szContent, charsmax(szContent), szLine);
+    }
+
     fclose(hFile);
 
     new szMissingBlock[4096];
