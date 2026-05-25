@@ -10,6 +10,7 @@ const MAX_MAPNAME_LENGTH = 32;
 #endif
 
 new const CONFIG_FILE[] = "awp_limiter_disabled_maps.ini";
+new g_szCurMapName[MAX_MAPNAME_LENGTH];
 
 public plugin_init()
 {
@@ -30,16 +31,12 @@ public awpl_plugin_should_work_on_this_map(const szMapName[])
         return AWPL_CONTINUE;
     }
 
-    new DataPack:packedMapName = CreateDataPack();
-    WritePackString(packedMapName, szMapName);
-    ResetPack(packedMapName);
+    copy(g_szCurMapName, charsmax(g_szCurMapName), szMapName);
 
     new INIParser:iParser = INI_CreateParser();
-
     INI_SetReaders(iParser, "OnReadConfigKeyValue");
-    new iResult = INI_ParseFile(iParser, szConfigPath, .data = packedMapName);
+    new iResult = INI_ParseFile(iParser, szConfigPath);
     INI_DestroyParser(iParser);
-    DestroyDataPack(packedMapName);
 
     if(!iResult)
     {
@@ -51,14 +48,7 @@ public awpl_plugin_should_work_on_this_map(const szMapName[])
 
 public bool:OnReadConfigKeyValue(INIParser:handle, const key[], const value[], bool:invalid_tokens, bool:equal_token, bool:quotes, curtok, any:data)
 {
-    static szMapName[MAX_MAPNAME_LENGTH];
-
-    if(!szMapName[0])
-    {
-        ReadPackString(data, szMapName, charsmax(szMapName));
-    }
-
-    if(strcmp(szMapName, key, true) == 0)
+    if(strcmp(g_szCurMapName, key, true) == 0)
     {
         return false;
     }
