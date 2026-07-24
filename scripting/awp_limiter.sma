@@ -627,6 +627,10 @@ public RG_RoundEnd_post(WinStatus:status, ScenarioEventEndRound:event, Float:tmD
     debug_log(__LINE__, "--> Round is ended. <--");
 
     CheckOnline();
+
+    if (g_pCvarValue[LEADING_TEAM_RESTRICTION]) {
+        TakeAwpsFromLeadingTeam();
+    }
 }
 
 public CheckOnline() {
@@ -757,6 +761,64 @@ TakeAllAwps() {
         g_iAWPAmount[iUserTeam]--;
 
         client_print_color(id, print_team_red, "%s %l %l", g_pCvarValue[PLUGIN_CHAT_PREFIX], "CHAT_AWP_TAKEN_AWAY", "CHAT_REASON_LOW_ONLINE");
+
+        GiveCompensation(id);
+
+        debug_log(__LINE__, "(-) Now it's [ %i ] AWP in %i team", g_iAWPAmount[iUserTeam], iUserTeam);
+    }
+}
+
+TakeAwpsFromLeadingTeam() {
+    new iCTWins = get_member_game(m_iNumCTWins);
+    new iTWins = get_member_game(m_iNumTerroristWins);
+
+    if (iCTWins == iTWins) {
+        debug_log(__LINE__, "<TakeAwpsFromLeadingTeam> Score is tied (%i-%i). No action needed.", iCTWins, iTWins);
+        return;
+    }
+
+    new TeamName:iLeadingTeam = (iCTWins > iTWins) ? TEAM_CT : TEAM_TERRORIST;
+
+    debug_log(__LINE__, "<TakeAwpsFromLeadingTeam> Leading team: %i (CT: %i, T: %i)", iLeadingTeam, iCTWins, iTWins);
+
+    new TeamName:iUserTeam;
+
+    for (new id = 1; id <= MaxClients; id++) {
+        if (!is_user_alive(id)) {
+            continue;
+        }
+
+        if (g_pCvarValue[SKIP_BOTS] && is_user_bot(id)) {
+            continue;
+        }
+
+        iUserTeam = get_member(id, m_iTeam);
+
+        if (iUserTeam != iLeadingTeam) {
+            continue;
+        }
+
+        if (!user_has_awp(id)) {
+            continue;
+        }
+
+        if (PlayerHasImmunity(id)) {
+            debug_log(__LINE__, "Player <%n> has immunity. Skipped.", id);
+            continue;
+        }
+
+        ExecuteForward(g_iForwardsPointers[AWP_TAKEN_FROM_PLAYER], g_iReturn, id, LEADING_TEAM);
+
+        if (g_iReturn == AWPL_BREAK) {
+            debug_log(__LINE__, "AWP is not taken from player because of API.");
+            continue;
+        }
+
+        rg_remove_item(id, "weapon_awp");
+
+        g_iAWPAmount[iUserTeam]--;
+
+        client_print_color(id, print_team_red, "%s %l %l", g_pCvarValue[PLUGIN_CHAT_PREFIX], "CHAT_AWP_TAKEN_AWAY", "CHAT_REASON_LEADING_TEAM");
 
         GiveCompensation(id);
 
