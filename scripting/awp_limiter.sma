@@ -56,6 +56,7 @@ new g_bitImmunityFlags;
 new g_iNumAllowedAWP;
 new g_iOnlinePlayers;
 new bool:IsUserBot[MAX_PLAYERS + 1];
+new TeamName:g_iPreSwitchTeam[MAX_PLAYERS + 1];
 new g_bPauseRoundsRemaining[MAX_PLAYERS + 1];
 new Trie:g_iSaveRoundsRemaining;
 
@@ -137,12 +138,17 @@ public plugin_init() {
 
     register_dictionary("awp_limiter_n.txt");
 
+    for (new id = 1; id <= MaxClients; id++) {
+        IsUserBot[id] = bool:is_user_bot(id);
+    }
+
     RegisterHookChain(RG_CSGameRules_CanHavePlayerItem,     "RG_CSGameRules_CanHavePlayerItem_pre",     .post = false);
     RegisterHookChain(RG_CBasePlayer_HasRestrictItem,       "RG_CBasePlayer_HasRestrictItem_pre",       .post = false);
     RegisterHookChain(RG_CBasePlayer_AddPlayerItem,         "RG_CBasePlayer_AddPlayerItem_post",        .post = true);
     RegisterHookChain(RG_CSGameRules_RestartRound,          "RG_RestartRound_post",                     .post = true);
     RegisterHookChain(RG_CBasePlayer_RemovePlayerItem,      "RG_CBasePlayer_RemovePlayerItem_post",     .post = true);
     RegisterHookChain(RG_CBasePlayer_Killed,                "RG_CBasePlayer_Killed_pre",                .post = false);
+    RegisterHookChain(RG_CBasePlayer_SwitchTeam,            "RG_CBasePlayer_SwitchTeam_pre",            .post = false);
     RegisterHookChain(RG_CBasePlayer_SwitchTeam,            "RG_CBasePlayer_SwitchTeam_post",           .post = true);
 
     g_iHookChain_RoundEnd = RegisterHookChain(RG_RoundEnd,              "RG_RoundEnd_post",             .post = true);
@@ -305,7 +311,7 @@ public RG_CSGameRules_CanHavePlayerItem_pre(const id, const item) {
 
         SendReasonToPlayer(id, iReason);
 
-        SetHookChainReturn(ATYPE_INTEGER, false);
+        SetHookChainReturn(ATYPE_BOOL, false);
     }
 }
 
@@ -403,7 +409,7 @@ bool:TeamCanTakeAWP(const TeamName:iTeam) {
         case 2: return (g_iAWPAmount[iTeam] < g_iNumAllowedAWP);
     }
 
-    return true;
+    return false;
 }
 
 SendReasonToPlayer(id, AwpRestrictionType:iReason) {
@@ -584,9 +590,26 @@ public RG_CBasePlayer_Spawn_post(const id) {
     CheckOnline();
 }
 
+public RG_CBasePlayer_SwitchTeam_pre(const id) {
+    g_iPreSwitchTeam[id] = get_member(id, m_iTeam);
+}
+
 public RG_CBasePlayer_SwitchTeam_post(const id) {
     if (g_bIsLowOnline) {
         return;
+    }
+
+    new TeamName:iPlayerTeam = get_member(id, m_iTeam);
+    new TeamName:iOldTeam = g_iPreSwitchTeam[id];
+
+    if (iOldTeam != iPlayerTeam && user_has_awp(id) && !IsSkipBot(id)) {
+        if (g_iAWPAmount[iOldTeam] > 0) {
+            g_iAWPAmount[iOldTeam]--;
+        }
+
+        g_iAWPAmount[iPlayerTeam]++;
+
+        debug_log(__LINE__, "<SwitchTeam> Player <%n> moved from %i to %i team. AWP count adjusted.", id, iOldTeam, iPlayerTeam);
     }
 
     if (!g_pCvarValue[LEADING_TEAM_RESTRICTION]) {
@@ -604,8 +627,6 @@ public RG_CBasePlayer_SwitchTeam_post(const id) {
     if (PlayerHasImmunity(id)) {
         return;
     }
-
-    new TeamName:iPlayerTeam = get_member(id, m_iTeam);
 
     new iCTWins = get_member_game(m_iNumCTWins);
     new iTWins = get_member_game(m_iNumTerroristWins);
@@ -837,7 +858,7 @@ TakeAwpsFromTeam(TeamName:iTeam) {
     }
 
     get_players_ex(iPlayers, iPlayersNum, iGetPlayersFlags);
-    SortIntegers(iPlayers, sizeof iPlayers, Sort_Random);
+    SortIntegers(iPlayers, iPlayersNum, Sort_Random);
 
     for (new i, id; i < MAX_PLAYERS; i++) {
         id = iPlayers[i];
@@ -917,6 +938,8 @@ CreateCvars() {
         .has_max = true, .max_val = 2.0),
     g_pCvarValue[LIMIT_TYPE]);
 
+    hook_cvar_change(g_pCvarHandle[LIMIT_TYPE], "OnChangeCvar_LimitType");
+
     bind_pcvar_num(g_pCvarHandle[MAX_AWP] = create_cvar("awpl_max_awp", "2",
         .description = GetCvarDesc("CVAR_MAX_AWP"),
         .has_min = true, .min_val = 1.0),
@@ -976,6 +999,18 @@ CreateCvars() {
         .has_min = true, .min_val = 0.0,
         .has_max = true, .max_val = 1.0),
     g_pCvarValue[LEADING_TEAM_RESTRICTION]);
+}
+
+public OnChangeCvar_LimitType(pCvar, const szOldValue[], const szNewValue[]) {
+    new iNewValue = str_to_num(szNewValue);
+
+    if (iNewValue < 1 || iNewValue > 2) {
+        debug_log(__LINE__, "Cvar <awpl_limit_type> value %i is out of range. Clamped to %i.", iNewValue, iNewValue < 1 ? 1 : 2);
+        set_cvar_num("awpl_limit_type", iNewValue < 1 ? 1 : 2);
+        return;
+    }
+
+    debug_log(__LINE__, "Cvar <awpl_limit_type> changed. Old: %s. New: %s", szOldValue, szNewValue);
 }
 
 public OnChangeCvar_RoundInfinite(pCvar, const szOldValue[], const szNewValue[]) {
@@ -1057,6 +1092,10 @@ public native_awpl_set_low_online(iPlugin, iParams) {
 public native_awpl_can_team_take_awp(iPlugin, iParams) {
     new TeamName:iTeam = TeamName:get_param(1);
 
+    if (iTeam < TEAM_TERRORIST || iTeam > TEAM_CT) {
+        return false;
+    }
+
     return TeamCanTakeAWP(iTeam);
 }
 
@@ -1074,11 +1113,14 @@ public native_awpl_can_player_take_awp(iPlugin, iParams) {
 }
 
 public plugin_end() {
-	TrieDestroy(g_iSaveRoundsRemaining);
+    if (g_iSaveRoundsRemaining) {
+        TrieDestroy(g_iSaveRoundsRemaining);
+        g_iSaveRoundsRemaining = Invalid_Trie;
+    }
 
-	if (g_bIsDebugActive) {
-		log_to_file(g_szLogPath, "================================================================^n");
-	}
+    if (g_bIsDebugActive) {
+        log_to_file(g_szLogPath, "================================================================^n");
+    }
 }
 
 stock bool:IsCvarInConfig(const szContent[], const szCvarName[]) {
@@ -1110,19 +1152,22 @@ stock FormatCvarDesc(const szDescKey[], szOutput[], const iMaxLen) {
 
     for (new i; i < iLen; i++) {
         if (szDescRaw[i] == '^^' && szDescRaw[i + 1] == 'n') {
+            szLine[iLinePos] = EOS;
             add(szOutput, iMaxLen, "// ");
             add(szOutput, iMaxLen, szLine);
             add(szOutput, iMaxLen, "^n");
-            szLine[0] = EOS;
             iLinePos = 0;
             i++;
             continue;
         }
 
-        szLine[iLinePos++] = szDescRaw[i];
+        if (iLinePos < charsmax(szLine)) {
+            szLine[iLinePos++] = szDescRaw[i];
+        }
     }
 
     if (iLinePos) {
+        szLine[iLinePos] = EOS;
         add(szOutput, iMaxLen, "// ");
         add(szOutput, iMaxLen, szLine);
         add(szOutput, iMaxLen, "^n");
